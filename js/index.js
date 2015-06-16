@@ -1,9 +1,13 @@
 $(document).ready(function(){
+	console.log("index loaded");
 	
-	console.log("index ready!!!!!");
+	/*$("#sub").bind("click",function(){
+		content.load("sub");
+	})*/
 	
-	$("button").bind("click",function(){
-		content.load("first");
-	});
+	$("#sub").touch(function(){
+		content.load("sub");
+	},"touched");
 	
+	content.attach("header");
 });

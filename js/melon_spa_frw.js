@@ -1,64 +1,39 @@
-/*
- * Device Define
- */
-
-var _isAndroid   = (/android/gi).test(navigator.appVersion),
-	_isIDevice   = (/iphone|ipad/gi).test(navigator.appVersion),
-	_isIE        = (/MSIE/gi).test(navigator.appVersion),
-	_iasChrome   = (/Chrome/gi).test(navigator.appVersion),
-	_isMobileWeb = (_isAndroid || _isIDevice);
-
-/*
- * extend object
- */
-
-function Class() { }
-Class.prototype.construct = function() {};
-Class.extend = function(name,def)
-{
-	var classDef = function() {
-		if (arguments[0] !== Class) {
-			this.construct.apply(this, arguments);
-		}
-	};
-	
-	var proto = new this(Class);
-	var superClass = this.prototype;
-	
-	for (var n in def) {
-		var item = def[n];
-		if (item instanceof Function) item.$ = superClass;
-		proto[n] = item;
-	}
-	
-	classDef.prototype = proto;
-	classDef.extend = this.extend;
-	classDef.prototype.classname = name;
-	
-	return classDef;
-};
-
-
-/*
- * start module
- */
-
 $(document).ready(function(){
-	content._init();
+	content._init("config/config.js");
 });
 
-
-
 /*
- * content load
+ * SPA FrameWork
  * */
-var _ContentLoader = Class.extend("",{
-	
+var content = {	
 	loadedPage : null,
-	configUri : "config/config.js",
+	configUri : null,
 	subElement : [],
-	
-	_init : function(){
+	cache : true,
+	memory : true,
+	_prev_memory : null,
+	_prev_cache : null,
+	_prev_changed : false,
+	_memory_storage : [],
+	debugLevel : null,//"info",
+	initialState : false,
+	log : function(){
+		if(this.debugLevel == "info"){
+			var tmpStr = "";
+			for(var key in arguments){
+				tmpStr = tmpStr + " " + arguments[key];
+			}
+			console.info("  Melon :  " + tmpStr);
+		}
+	},
+		
+	_init : function(uri){
+		this.configUri = uri;
+		this.log("========= melon SPA Framework initialize======== ");
+		this.log("Chache:",this.cache);
+		this.log("Memory:",this.memory);
+		this.log("configUri:",this.configUri);
+		this.log("================================================ ");
 		var that = this;
 		this._getConfigFile(function(){
 			that._initHashData(that._loadInit);
@@ -66,6 +41,13 @@ var _ContentLoader = Class.extend("",{
 	},
 	
 	_loadInit : function(){
+
+		content.log("========= melon SPA Initial Page Load Request ======== ");
+		content.log("initial_alias:",initial_alias);
+		content.log("Chache:",content.cache);
+		content.log("Memory:",content.memory);
+		content.log("====================================================== ");
+		
 		content.load(initial_alias);
 		var hash = location.hash.split("#").join("");
 		if(hash == initial_alias){
@@ -75,19 +57,29 @@ var _ContentLoader = Class.extend("",{
 	
 	_getConfigFile : function(fn){
 		var thatFn = fn;
-		$.getScript(this.configUri,function(data){
+		var that = this;
+		$.cachedScript (this.configUri).done(function(data){
 			eval(thatFn());
 		});
 	},
 	
 	_initHashData : function(fn){
-		
 		var that = this;
 		var hash = location.hash.split("#").join("");
 		
 		$(window).bind('hashchange', function() {
 			var hash = location.hash.split("#").join("");
-			that._procHashData(hash);
+			var hashConfiged = false;
+			for(var key in map_config){
+				if(hash == map_config[key]["alias"])
+					hashConfiged = true;
+			}
+			if(hashConfiged){
+				if(that.loadedPage != null){
+					that._procHashData(hash);
+				}
+			}
+			
 		});
 		
 		if(initial_alias == hash || hash == "" ){
@@ -108,10 +100,14 @@ var _ContentLoader = Class.extend("",{
 		
 		if(hash == "" || hash == initial_alias){
 			hash == initial_alias
-			config_base_html_path = "";
-			config_base_js_path = "js";
+			config_base_html_path = initial_path;
+			config_base_js_path = initial_path + "js";
 		}
-
+		
+		if(config_base_html_path == "/")
+			config_base_html_path = "";
+		
+		
 		this._getRemoteData(config_base_html_path + "/" + _tmpHtml,hash);
 	},
 	
@@ -120,24 +116,83 @@ var _ContentLoader = Class.extend("",{
 		var thatHash = hash;
 		var that = this;
 		
-		$.get(uri).done(function(data){
-			
+		if(!this.memory){
+			that._getData(uri,thatHash);
+		}else{
+			var _tmpLoadedState = false;
+			var _tmpData = null;
+			if(this._memory_storage.length > 0){
+				for(var key in this._memory_storage){
+					if(this._memory_storage[key]["alias"] == thatHash){
+						_tmpLoadedState = true;
+						_tmpData = this._memory_storage[key]["body"];
+					}
+				}
+			}
+			if(!_tmpLoadedState){
+				this._getData(uri,thatHash);
+			}else{
+				this._setMemData(_tmpData,thatHash);
+			}
+		}
+	},
+	
+	_setMemData : function(data,hash){
+		var body = (data.split("<body>")[1]).split("</body>")[0];
+		var save = $('div[data-detach="true"]').detach();
+		
+		$('body').empty().append(save);
+		$("body").append(body);
+		
+		var tmp_title = (data.split("<title>")[1]).split("</title>")[0];
+		$("title").empty();
+		$("title").html(tmp_title);
+		
+		this._runScript(hash,true);
+	},
+	
+	_getData : function(uri,hash){
+		
+		var that = this;
+		var thatHash = hash;
+		$.getData(uri).done(function(data){	
 			var body = (data.split("<body>")[1]).split("</body>")[0];
 			var save = $('div[data-detach="true"]').detach();
 			
 			$('body').empty().append(save);
-			$("body").prepend(body);
+			$("body").append(body);
 			
 			var tmp_title = (data.split("<title>")[1]).split("</title>")[0];
 			$("title").empty();
 			$("title").html(tmp_title);
 			
 			that._runScript(thatHash);
+			if(that.memory){
+				that._push_memdata(thatHash,data);
+			}
 		});
-		
 	},
 	
-	load : function(alias){
+	_push_memdata : function(alias,data){
+		this._memory_storage.push({"alias":alias,"body":data,"js":""});
+	},
+	
+	load : function(alias,option){
+		
+		if(option != null){
+			this.log("load option exist",option);
+			this._prev_memory = this.memory;
+			this._prev_cache = this.cache;
+			this.memory = option["memoey"];
+			this.cache = option["cache"];
+			this._prev_changed = true;
+		}
+		
+		this.log("========= melon SPA Page Load Request ======== ");
+		this.log("alias:",alias);
+		this.log("Chache:",this.cache);
+		this.log("Memory:",this.memory);
+		this.log("====================================================== ");
 		this._changeHash(map_config[this._getConfigMap(alias)]);
 	},
 	
@@ -145,22 +200,55 @@ var _ContentLoader = Class.extend("",{
 		$(location).attr('href',window.location.pathname + '#' + obj["alias"]);
 	},
 	
-	_runScript : function(alias){
-		
+	_runScript : function(alias,option){
+	
 		var config_base_js_path   = base_config["contentJSDir"];
 		var that = this;
 		
 		if(alias == initial_alias){
-			config_base_js_path = "js";
+			config_base_js_path = initial_path + "js";
+			this.initialState = true;
+		}
+	
+		var thatAlias = alias;
+		var thatOption = option;
+		
+		if(!this.initialState){
+			$(location).attr('href',initial_path + map_config[this._getConfigMap(initial_alias)]["html"]);
+			//window.location.href = initial_path + map_config[this._getConfigMap(initial_alias)]["html"];
+		}else{
+		
+			if(thatOption && that.memory){
+				for(var key in this._memory_storage){
+					if(this._memory_storage[key]["alias"] == thatAlias){
+						eval(this._memory_storage[key]["js"]);
+						this.loadedPage = thatAlias;
+					}
+				}
+			}else{
+				$.cachedScript(config_base_js_path + "/" + map_config[this._getConfigMap(alias)]["js"]).done(
+						function(data){
+							that.loadedPage = thatAlias;
+							if(option != true && that.memory){
+								for(var key in that._memory_storage){
+									if(that._memory_storage[key]["alias"] == thatAlias){
+										that._memory_storage[key]["js"] = data; 
+									}
+								}
+							}
+						}
+					);
+			}
+			
 		}
 		
-		var thatAlias = alias;
+		if(this._prev_changed){
+			
+			this.memory = this._prev_memory;
+			this.cache = this._prev_cache;
+			this._prev_changed = false;
+		}
 		
-		$.getScript(config_base_js_path + "/" + map_config[this._getConfigMap(alias)]["js"],
-			function(data){
-				that.loadedPage = thatAlias;
-			}
-		);
 	},
 	
 	_getConfigMap : function(alias){
@@ -172,16 +260,25 @@ var _ContentLoader = Class.extend("",{
 	},
 	
 	attach : function(alias){
-		
 		var thatAlias = alias;
 		var that = this;
 		if(this.subElement.indexOf(alias) > -1){
 			
 		}else{
-			$.get(base_ele_config["contentHTMLDir"] + "/" + map_ele_config[this._getEleConfigMap(alias)]["html"],function(data){
-				$("body").append("<div id = '" + thatAlias + "' data-detach = '" + map_ele_config[that._getEleConfigMap(thatAlias)]["detach"] +  "'>" + data + "</div>");
+			$.getData(base_ele_config["contentHTMLDir"] + "/" + map_ele_config[this._getEleConfigMap(alias)]["html"],function(data){
+				if(map_ele_config[that._getEleConfigMap(thatAlias)]["prepend"]){
+					$("body").prepend("<div id = '" + thatAlias + "' data-detach = '" + map_ele_config[that._getEleConfigMap(thatAlias)]["detach"] +  "'>" + data + "</div>");
+				}else{
+					$("body").append("<div id = '" + thatAlias + "' data-detach = '" + map_ele_config[that._getEleConfigMap(thatAlias)]["detach"] +  "'>" + data + "</div>");
+				}
+				
+				$.cachedScript(base_ele_config["contentJSDir"] + "/" + map_ele_config[that._getEleConfigMap(thatAlias)]["js"],function(){
+					eval(map_ele_config[that._getEleConfigMap(thatAlias)]["startHandler"] + "();");
+				});
 			});
-			$.getScript(base_ele_config["contentJSDir"] + "/" + map_ele_config[this._getEleConfigMap(alias)]["js"]);
+			
+			
+			
 			this.subElement.push(alias);
 		}
 	},
@@ -200,25 +297,28 @@ var _ContentLoader = Class.extend("",{
 		}
 	},
 	
-});
-/*
- * App Base Class
- */
-var App = Class.extend("",{
+}
 
-});
 
-/*
- * Application Class
- */
-var Application = App.extend("Application",{
 
+jQuery.getData = function( url , callback , options ) {
+	 
+	options = $.extend( options || {}, {
+		dataType: "html",
+		cache: content.cache,
+		url: url
+	});
 	
-});
+	return jQuery.ajax( options ).done(eval(callback));
+};
 
-
-/*
- * Class Define 
- */
-var content = new _ContentLoader();
-
+jQuery.cachedScript = function( url,callback, options ) {
+	 
+	options = $.extend( options || {}, {
+		dataType: "script",
+		cache: content.cache,
+		url: url
+	});
+	
+	return jQuery.ajax( options ).done(eval(callback));
+};

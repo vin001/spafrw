@@ -1,3 +1,6 @@
+var initial_alias = "index";
+var initial_path = "/";
+
 var base_config = {
 	"contentHTMLDir" : "content/html",	
 	"contentJSDir" : "content/js",	
@@ -6,20 +9,16 @@ var base_config = {
 var map_config = 
 [
 	{"alias": "index" ,"html":"index.html","js":"index.js"},
-	{"alias": "first" ,"html":"a.html","js":"a.js"},
-	{"alias": "second" ,"html":"b.html","js":"b.js"},
+	{"alias": "sub" ,"html":"sub.html","js":"sub.js"},
 ];
-
-var initial_alias = "index";
 
 var map_ele_config = 
 [
- 	{"alias":"pop","html":"pop.html","js":"pop.js","detach":true},
- 	{"alias":"pop2","html":"pop2.html","js":"pop2.js","detach":false},
- 
+	{"alias":"header","html":"header.html","js":"header.js","detach":true,"prepend":true,startHandler:"header_start"},	
+
  ];
 
 var base_ele_config = {
-	"contentHTMLDir" : "content/element/html",	
-	"contentJSDir" : "content/element/js",	
+	"contentHTMLDir" : "element/html",	
+	"contentJSDir" : "element/js",	
 }
